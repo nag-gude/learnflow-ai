@@ -78,7 +78,7 @@ export default function ChatPanel({ state, dispatch }: ChatPanelProps) {
                 ? 'What do you want to learn today?'
                 : 'Type your answer...'
           }
-          className="w-full px-4 py-2 rounded-full border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 rounded-full border border-gray-300 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
         />
       </div>
     </div>
