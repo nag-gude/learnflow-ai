@@ -6,17 +6,67 @@ import { Message, PlanState } from '@/lib/types'
 
 export const maxDuration = 60
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+type Provider = 'openai' | 'openrouter' | 'groq'
+
+const PROVIDER_CONFIGS: Record<Provider, { baseURL: string; envKey: string; defaultModel: string }> = {
+  openai: {
+    baseURL: 'https://api.openai.com/v1',
+    envKey: 'OPENAI_API_KEY',
+    defaultModel: 'gpt-4o',
+  },
+  openrouter: {
+    baseURL: 'https://openrouter.ai/api/v1',
+    envKey: 'OPENROUTER_API_KEY',
+    defaultModel: 'openai/gpt-4o',
+  },
+  groq: {
+    baseURL: 'https://api.groq.com/openai/v1',
+    envKey: 'GROQ_API_KEY',
+    defaultModel: 'llama-3.3-70b-versatile',
+  },
+}
+
+function getProviderClient(): { client: OpenAI; model: string; provider: Provider } {
+  const provider = (process.env.AI_PROVIDER ?? 'openrouter') as Provider
+  const config = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.openrouter
+  const apiKey = process.env[config.envKey]
+
+  if (!apiKey) {
+    throw new Error(`${config.envKey} not configured for provider "${provider}"`)
+  }
+
+  const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
+    apiKey,
+    baseURL: config.baseURL,
+  }
+
+  if (provider === 'openrouter') {
+    clientOptions.defaultHeaders = {
+      'HTTP-Referer': process.env.OPENROUTER_SITE_URL ?? 'http://localhost:3000',
+      'X-Title': process.env.OPENROUTER_SITE_NAME ?? 'Learning Coach',
+    }
+  }
+
+  return {
+    client: new OpenAI(clientOptions),
+    model: process.env.AI_MODEL ?? config.defaultModel,
+    provider,
+  }
+}
 
 export async function POST(request: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured' }), {
+  let providerSetup: ReturnType<typeof getProviderClient>
+  try {
+    providerSetup = getProviderClient()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Provider not configured'
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
   }
+
+  const { client, model } = providerSetup
 
   const body = await request.json()
   const { subPhase, topic, messages, planState }: {
@@ -46,8 +96,8 @@ export async function POST(request: Request) {
       }
 
       try {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o',
+        const completion = await client.chat.completions.create({
+          model,
           messages: openaiMessages,
           ...(tools.length > 0 ? { tools } : {}),
           stream: true,
