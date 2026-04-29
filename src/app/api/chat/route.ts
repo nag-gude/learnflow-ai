@@ -6,18 +6,13 @@ import { Message, PlanState } from '@/lib/types'
 
 export const maxDuration = 60
 
-type Provider = 'openai' | 'openrouter' | 'groq'
+type Provider = 'openai' | 'groq'
 
 const PROVIDER_CONFIGS: Record<Provider, { baseURL: string; envKey: string; defaultModel: string }> = {
   openai: {
     baseURL: 'https://api.openai.com/v1',
     envKey: 'OPENAI_API_KEY',
     defaultModel: 'gpt-4o',
-  },
-  openrouter: {
-    baseURL: 'https://openrouter.ai/api/v1',
-    envKey: 'OPENROUTER_API_KEY',
-    defaultModel: 'openai/gpt-4o',
   },
   groq: {
     baseURL: 'https://api.groq.com/openai/v1',
@@ -26,31 +21,18 @@ const PROVIDER_CONFIGS: Record<Provider, { baseURL: string; envKey: string; defa
   },
 }
 
-function getProviderClient(): { client: OpenAI; model: string; provider: Provider } {
-  const provider = (process.env.AI_PROVIDER ?? 'openrouter') as Provider
-  const config = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.openrouter
+function getProviderClient(): { client: OpenAI; model: string } {
+  const provider = (process.env.AI_PROVIDER ?? 'groq') as Provider
+  const config = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.groq
   const apiKey = process.env[config.envKey]
 
   if (!apiKey) {
     throw new Error(`${config.envKey} not configured for provider "${provider}"`)
   }
 
-  const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
-    apiKey,
-    baseURL: config.baseURL,
-  }
-
-  if (provider === 'openrouter') {
-    clientOptions.defaultHeaders = {
-      'HTTP-Referer': process.env.OPENROUTER_SITE_URL ?? 'http://localhost:3000',
-      'X-Title': process.env.OPENROUTER_SITE_NAME ?? 'Learning Coach',
-    }
-  }
-
   return {
-    client: new OpenAI(clientOptions),
+    client: new OpenAI({ apiKey, baseURL: config.baseURL }),
     model: process.env.AI_MODEL ?? config.defaultModel,
-    provider,
   }
 }
 
